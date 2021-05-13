@@ -23,7 +23,7 @@ jupyter notebook KE\ movie\ plot.ipynb
 
 One of the vital elements of a movie is the plot. More often than not, the plot provides most intuitive presentations of the underlying movie logic and carries most information facilitating viewer understanding. Thus, the task of **plot understanding** is one of the most valuable tasks in movie analysis.  
 
-Currenlty, it is very common that **a major portion of effort and time is paid to extract the plot features when conducting movie analysis.** Particularly, when the analysis involves multiple movies, manual approaches takes even longer time as per the extra counting and statistics steps involved. 
+Currenlty, it is very common that **a major portion of effort and time is paid to extracting the plot features when conducting movie analysis.** Particularly, when the analysis involves multiple movies, manual approaches takes even longer time as per the extra counting and statistics steps involved. 
 
 This project aims to **offer a novel perspective to the task of plot understanding in the context of modern Indian Cinema.** We tackle the problem mainly with Natural Language Processing techniques. We propose an automated pipeline to extract the plot features and generate latent representations for the features. We also included visualization modules to convert the latent features extracted to existent keywords in the plot, and present them in the form of wordclouds. 
 
@@ -53,14 +53,62 @@ To summarize, in this project, we
 
 ## Plot accessing 
 
-We access the plot of target movies with the WikiPedia APIs. We use the raw text in the "slot" section on the WikiPedia page of the movie as our plot text. 
+We access the plot of target movies with the Wikipedia APIs. We use the raw text in the "slot" section on the Wikipedia page of the movie as our plot text. Currently, we use the pageid of the Wikipedia for efficient querying. In our example, the pageid can be found in /resources/movie_ids.json
 
-## Keyword Extraction 
-### Pretrained models (BERT)
-### EmbedRank and Maximum Marginal Relevance
+## Keyword Extraction  
+
+The keywords extraction module mainly utilizes the following key components in sequence: 
+1. **A preprocessing unit** that sift out all plausible keyword phrases. 
+2. **A pre-trained language models** to encode word/document embeddings. We kept only the high-confidence keyphrases as keyword candidates.
+3. **EmbedRank** and **Maximum Marginal Relevance** modules that increases keyword diversity. 
+   
+
+### Preprocessing unit
+The preprocessing of the plot consists of the following aspects: 
+1. A **lemmatizer** that reduces inflectional form of words into its original base via morphological analysis. (e.g. Studying -> study, happiest -> happy). By lemmatization we allow our model to focus more on the meaning of the word instead of the exact expression. 
+2. A **combinational tokenizer** that splits the document into possibly meaningful phrases with regular expressions. With a regular tokenizer, we can divide a long string separated by a separator (e.g. the space character ' ') into word tokens. We further sift out all combinations of continuous tokens in the form "zero or more adjectives + one or more nouns" (*JJ\*NN+*) via regular expression. 
+
+### Pre-trained language model (SentenceTransformer) 
+
+In this project, we are using the pre-trained SentenceTransformer model from **HuggingFace**, the specific model we are using is [distilbert-base-nli-mean-tokens](https://huggingface.co/sentence-transformers/bert-base-nli-mean-tokens). 
+
+This pre-trained model allows us to map a word or a document to a vector in a high-dimensional (768 dimensions) semantic space. 
+
+i.e. For any word $W$, the embedding of $W$ is given by 
+$$W_{embedding} = SentenceTransformer.encode(W)$$
+
+The embedding vector can be used as mathematical calculation ingredients. For example, 
+$$King_{embedding} - Man_{embedding} + Woman_{embedding} = Queen_{embedding} $$
+
+In this project, we use the embedding vectors to calculate the similarity between a word and the document containing it. Specifically, we will use the cosine similarity between the document embedding vector and the word embedding vector as the quantitative measure for the similarity between a word and the document containing it. This similarity will be used as the criterion for keywords identification. 
+
+### EmbedRank with Maximum Marginal Relevance (MMR)
+
+The keyword extraction result with the approach above suffer from two major issues:
+
+1. **Word Homogeneity**, some of the selected keywords may only be morphological variations of each other. 
+2. **Incomplete coverage**, due to the concentration of the keyword selection centering the document embedding vector. 
+
+For a concrete example, we use the following scenario as presented in the [original paper](https://www.aclweb.org/anthology/K18-1022/), 
+![EmbedRankIssue](./resources/EmbedRankImg1.png)
+
+Here we see both a overly homogeneous selection (e.g. *molecular equivalence numbers*, *molecular equivalence indices*, and *molecular equivalence number*) and an incomplete coverage of keywords. 
+
+EmbedRank with MMR is proposed to tackle this issue. MMR is a mathematical approach that diversify the selection. The strength of this diversifying effect is controlled by a user-specified hyperparameter (*Diversity factor*). We will not go into the unnecessary mathematic details here due to many reasons. 
+
+The result of improvement, with MMR, is as follows:
+
+![EmbedRankResult](./resources/EmbedRankImg2.png) 
+
+As can be observed, the previous issues has been alleviated. 
 
 ## Visual representaion
-### Wordcloud
-### Mask
 
+We represent our final output with wordclouds, where the size of a word in the image represents the importance (higher similarity between the word embedding vector and the document embedding vector) of that word in its original document. 
+
+## Result
+
+The keyword wordcloud for the top 10 movies: 
+
+![WordCloud for top 10 Movies](./resources/ResultImg.png) 
 
